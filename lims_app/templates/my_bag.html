@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+{% extends "index.html" %}
+{% load static %}
+
+{% block main_content %}
+<style>
+    /* Your CSS styles here (keep as per your original or customize) */
+</style>
+
+<div class="container main-content-container">
+    <!-- ... your existing header and nav ... -->
+
+    <div class="row mt-4">
+        <div class="col-md-7">
+            <h5>Books in your bag - {{ bag_items|length }}</h5>
+            <div class="bag-items-list">
+                {% if bag_items %}
+                    {% for item in bag_items %}
+                        <div class="bag-item" id="bag-item-{{ item.book.id }}">
+                            <img src="{% static 'images/default_book_cover.png' %}" alt="Book Cover">
+                            <div class="bag-item-details">
+                                <h6>{{ item.book.title }}</h6>
+                                {% if item.book.subtitle %}<small>{{ item.book.subtitle }}</small>{% endif %}
+                                <small>Written by {{ item.book.author }}</small>
+                                <small>Published by {{ item.book.publisher }}, {% if item.book.published_date %}{{ item.book.published_date.year }}{% else %}-{% endif %}</small>
+                            </div>
+                            <button 
+                                class="btn btn-danger btn-sm book-action-button" 
+                                data-book-id="{{ item.book.id }}"
+                                data-action="remove"
+                                onclick="toggleBagFromMyBag(this)"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info text-center" role="alert">
+                        Your bag is empty. Add some books from the <a href="{% url 'books_list' %}">Books</a> tab!
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="checkout-form-container">
+                <h5>Ready for Checkout?</h5>
+
+                <!-- Show error messages here -->
+                {% if error_message %}
+                    <div class="alert alert-danger">{{ error_message }}</div>
+                {% endif %}
+
+               <form method="POST" action="{% url 'process_checkout' %}">
+    {% csrf_token %}
+    
+    <div class="mb-3">
+        <label for="readerReferenceId" class="form-label">Reference ID:</label>
+        <div class="input-group">
+            <input
+                type="text"
+                class="form-control"
+                id="readerReferenceId"
+                name="reader_id"
+                placeholder="Enter Reference ID or search by Name or Contact"
+                value="{{ form_data.reader_id|default_if_none:'' }}"
+            >
+            <button class="btn btn-primary" type="button" id="goButton">Go</button>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="readerName" class="form-label">Name:</label>
+        <input
+            type="text"
+            class="form-control"
+            id="readerName"
+            name="reader_name"
+            placeholder="Enter Name or Reference ID or Contact"
+            value="{{ form_data.reader_name|default_if_none:'' }}"
+        >
+    </div>
+
+    <div class="mb-3">
+        <label for="readerContact" class="form-label">Contact:</label>
+        <input
+            type="text"
+            class="form-control"
+            id="readerContact"
+            name="reader_contact"
+            placeholder="Enter Contact or Reference ID or Name"
+            value="{{ form_data.reader_contact|default_if_none:'' }}"
+        >
+    </div>
+
+    <div class="mb-3">
+        <label for="startDate" class="form-label">Start date & time:</label>
+        <input
+            type="datetime-local"
+            class="form-control"
+            id="startDate"
+            name="start_date"
+            value="{{ form_data.start_date|default:start_date_default }}"
+            required
+        >
+    </div>
+
+    <div class="mb-3">
+        <label for="returnDate" class="form-label">Return due date & time:</label>
+        <input
+            type="datetime-local"
+            class="form-control"
+            id="returnDate"
+            name="return_date"
+            value="{{ form_data.return_date|default:return_date_default }}"
+            required
+        >
+    </div>
+
+    {% if error_message %}
+        <div class="alert alert-danger">{{ error_message }}</div>
+    {% endif %}
+
+    <button type="submit" class="btn btn-success w-100">Proceed to Checkout</button>
+</form>
+
+                <div class="info-box mt-3">
+                    <p>Readers should not mark, underline, write, or tear pages or otherwise damage the library documents.</p>
+                    <ul>
+                        <li>Readers are requested to handle all Library property carefully to avoid damage and not disturb other users.</li>
+                        <li>No Library material can be taken out of the library without permission of the Librarian.</li>
+                        <li>Four books are loaned for maximum of two weeks and must be returned on or before the due date.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i=0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Remove book from bag
+    function toggleBagFromMyBag(buttonElement) {
+        const bookId = buttonElement.dataset.bookId;
+        const url = `/mybag/add_remove/${bookId}/`;
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success' && data.action === 'removed') {
+                const bagItemElement = document.getElementById(`bag-item-${bookId}`);
+                if (bagItemElement) {
+                    bagItemElement.remove();
+                    const bagCountElement = document.querySelector('.main-content-container .row.mt-4 .col-md-7 h5');
+                    if (bagCountElement) {
+                        const currentCountMatch = bagCountElement.textContent.match(/\d+/);
+                        let currentCount = currentCountMatch ? parseInt(currentCountMatch[0]) : 0;
+                        bagCountElement.textContent = `Books in your bag - ${currentCount - 1}`;
+                    }
+                    const bagItemsListContainer = document.querySelector('.bag-items-list');
+                    if (bagItemsListContainer.children.length === 0) {
+                        bagItemsListContainer.innerHTML = `
+                            <div class="alert alert-info text-center" role="alert">
+                                Your bag is empty. Add some books from the <a href="{% url 'books_list' %}">Books</a> tab!
+                            </div>
+                        `;
+                    }
+                }
+            } else {
+                alert('Failed to remove book from bag. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error removing bag item:', error);
+            alert('Failed to remove book from bag. Please try again.');
+        });
+    }
+
+    document.getElementById('goButton').addEventListener('click', function() {
+        const referenceId = document.getElementById('readerReferenceId').value.trim();
+        const name = document.getElementById('readerName').value.trim();
+        const contact = document.getElementById('readerContact').value.trim();
+
+        if (!referenceId && !name && !contact) {
+            alert('Please enter Reference ID, Name, or Contact to search.');
+            return;
+        }
+
+        fetch("{% url 'reader_search_api' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                reference_id: referenceId,
+                name: name,
+                contact: contact
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.found) {
+                document.getElementById('readerReferenceId').value = data.reference_id || '';
+                document.getElementById('readerName').value = data.name || '';
+                document.getElementById('readerContact').value = data.contact || '';
+            } else {
+                alert('Reader not found.');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching reader:', error);
+            alert('An error occurred while searching for the reader.');
+        });
+    });
+
+    // Auto-populate return date (2 weeks from now)
+    document.addEventListener('DOMContentLoaded', function() {
+        const returnDateInput = document.getElementById('returnDate');
+        if (!returnDateInput.value) {  // only set if empty
+            const today = new Date();
+            const twoWeeksLater = new Date(today.getTime() + (14 * 24 * 60 * 60 * 1000));
+            
+            const day = String(twoWeeksLater.getDate()).padStart(2, '0');
+            const month = String(twoWeeksLater.getMonth() + 1).padStart(2, '0');
+            const year = twoWeeksLater.getFullYear();
+            const hours = String(twoWeeksLater.getHours()).padStart(2, '0');
+            const minutes = String(twoWeeksLater.getMinutes()).padStart(2, '0');
+
+            returnDateInput.value = `${day}/${month}/${year} ${hours}:${minutes}`;
+        }
+    });
+
+    // Form submit validation to ensure required fields filled
+    document.getElementById('checkoutForm').addEventListener('submit', function(e) {
+        const readerId = document.getElementById('readerReferenceId').value.trim();
+        const startDate = document.getElementById('startDate').value.trim();
+        const returnDate = document.getElementById('returnDate').value.trim();
+
+        if (!readerId) {
+            alert('Reference ID is required.');
+            e.preventDefault();
+            return;
+        }
+        if (!startDate) {
+            alert('Start Date is required.');
+            e.preventDefault();
+            return;
+        }
+        if (!returnDate) {
+            alert('Return Date is required.');
+            e.preventDefault();
+            return;
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+<!doctype html>
+{% load static %}
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Library Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      .jumbotron {
+        padding: 2rem 1rem;
+        margin-bottom: 2rem;
+        background-color: #e9ecef;
+        border-radius: 0.3rem;
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- jQuery -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+
+    <!-- Navbar -->
+    <nav class="navbar bg-body-tertiary">
+      <div class="container-fluid justify-content-center align-items-center" style="background-color: #0000ff;">
+        <span class="navbar-brand mb-0 h1 text-light">
+          <img src="{% static 'OIP.jpeg' %}" alt="LIMS" height="45" style="margin-right: 10px;">
+          City Library
+        </span>
+      </div>
+
+      <!-- Nav Tabs -->
+      <div class="container-fluid d-flex justify-content-center">
+        <ul class="nav nav-tabs">
+          <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'home' %}active{% endif %}" href="/home">HOME</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'readers' %}active{% endif %}" href="/readers">READERS</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'books' %}active{% endif %}" href="/books">BOOKS</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'mybag' %}active{% endif %}" href="/mybag">MY BAG</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'returns' %}active{% endif %}" href="/returns">RETURNS</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Content Block -->
+    {% block main_content %}
+    {% endblock %}
+
+    <!-- JS Block for pages like books.html -->
+    {% block extra_js %}
+    {% endblock %}
+
+  </body>
+</html>

@@ -1,0 +1,89 @@
+{% extends "index.html" %}
+{% load static %}
+
+{% block main_content %}
+<div class="container mt-5">
+    <h3 class="mb-4">Returns</h3>
+
+    {% if loans %}
+    <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Reference ID</th>
+                <th>Start Date</th>
+                <th>Return Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for loan in loans %}
+            <tr id="loan-row-{{ loan.id }}">
+                <td>{{ loan.reader.reader_name }}</td>
+                <td>{{ loan.reader.reader_contact }}</td>
+                <td>{{ loan.reader.referece_id }}</td>
+                <td>{{ loan.start_date }}</td>
+                <td>{{ loan.end_date }}</td>
+                <td>
+                    <button class="btn btn-success btn-sm" onclick="returnBook({{ loan.id }})">Returned</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="alert alert-info text-center">
+        No books pending return.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// CSRF token helper
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+// Function to mark loan as returned
+function returnBook(loanId) {
+    fetch(`/returns/return_loan/${loanId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json'
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const row = document.getElementById(`loan-row-${loanId}`);
+            if (row) {
+                row.remove(); // Remove row on successful return
+            }
+            alert("Book marked as returned!");
+        } else {
+            alert("Failed to return book: " + data.message);
+        }
+    })
+    .catch(error => {
+        console.error("Error:", error);
+        alert("Error returning book. Try again.");
+    });
+}
+</script>
+{% endblock %}

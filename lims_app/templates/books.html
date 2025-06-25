@@ -1,0 +1,287 @@
+{% extends "index.html" %}
+{% load static %}
+
+{% block main_content %}
+<style>
+  body {
+    background-color: #f0f2f5;
+  }
+
+  .city-library-header {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 0;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .top-nav-links a {
+    color: #343a40;
+    font-weight: 500;
+    text-decoration: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+  }
+
+  .top-nav-links a:hover {
+    background-color: #e9ecef;
+  }
+
+  .top-nav-links a.active-link {
+    color: #007bff;
+    font-weight: bold;
+    border-bottom: 2px solid #007bff;
+  }
+
+  .search-bar-container {
+    background-color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  .book-item {
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  .book-item img {
+    width: 70px;
+    height: 100px;
+    object-fit: cover;
+    margin-right: 15px;
+    border: 1px solid #e9ecef;
+    border-radius: 3px;
+  }
+
+  .book-item-details {
+    flex-grow: 1;
+  }
+
+  .book-item-details h6 {
+    margin-bottom: 3px;
+    font-size: 1rem;
+    color: #343a40;
+  }
+
+  .book-item-details small {
+    display: block;
+    color: #6c757d;
+    font-size: 0.85rem;
+    line-height: 1.3;
+  }
+
+  .book-action-button {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  .pagination-buttons .btn {
+    min-width: 90px;
+  }
+
+  .main-content-container {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 0 15px;
+  }
+
+  .books-count-text {
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    color: #343a40;
+  }
+
+  .modal-body .mb-3 {
+    margin-bottom: 1rem;
+  }
+
+  .modal-body label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+</style>
+
+<div class="container main-content-container">
+  <!-- Header -->
+  <div class="row justify-content-center city-library-header">
+    <div class="col-12 text-center">
+      <h3 style="margin: 0;">City Library</h3>
+    </div>
+  </div>
+
+  <!-- Search + Nav Links -->
+  <div class="row justify-content-center">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4 search-bar-container">
+        <div class="top-nav-links">
+          <a class="btn" href="{% url 'home' %}">HOME</a>
+          <a class="btn" href="{% url 'readers_tab' %}">READERS</a>
+          <a class="btn active-link" href="{% url 'books_list' %}">BOOKS</a>
+          <a class="btn" href="{% url 'my_bag_tab' %}">MY BAG</a>
+          <a class="btn" href="#">RETURNS</a>
+        </div>
+        <form class="d-flex" method="GET" action="{% url 'books_list' %}">
+          <input class="form-control me-2" type="search" placeholder="Search" name="search" value="{{ search_query }}" style="width: 200px;"/>
+          <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+      </div>
+
+      <!-- Upload/Add Buttons -->
+      <div class="d-flex justify-content-start mb-4">
+        <button class="btn btn-primary me-2">Upload</button>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addBookModal">Add a book</button>
+      </div>
+
+      <p class="books-count-text">
+        <strong>{{ page_obj.paginator.count }}</strong> book{{ page_obj.paginator.count|pluralize }} available.
+      </p>
+
+      <!-- Book List -->
+      <div class="books-list">
+        {% for book in books %}
+        <div class="book-item">
+          <img src="{% static 'images/default_book_cover.png' %}" alt="Book Cover">
+          <div class="book-item-details">
+            <h6>{{ book.title }}</h6>
+            {% if book.subtitle %}<small>{{ book.subtitle }}</small>{% endif %}
+            <small>Written by {{ book.author }}</small>
+            <small>Published by {{ book.publisher }}, {% if book.published_date %}{{ book.published_date.year }}{% else %}-{% endif %}</small>
+          </div>
+
+          <button
+            class="btn btn-sm book-action-button {% if book.id in bagged_book_ids %}btn-danger{% else %}btn-primary{% endif %}"
+            data-book-id="{{ book.id }}"
+            data-url="{% url 'add_remove_book_to_bag' book.id %}"
+            data-action="{% if book.id in bagged_book_ids %}remove{% else %}add{% endif %}"
+            onclick="toggleBag(this)"
+          >
+            {% if book.id in bagged_book_ids %}Remove from bag{% else %}Add to bag{% endif %}
+          </button>
+        </div>
+        {% empty %}
+        <div class="alert alert-warning text-center" role="alert">
+          No books found.
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      <div class="d-flex justify-content-center mt-4 pagination-buttons">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-outline-secondary me-2">Previous</a>
+        {% else %}
+          <button class="btn btn-outline-secondary me-2" disabled>Previous</button>
+        {% endif %}
+
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-outline-secondary">Next</a>
+        {% else %}
+          <button class="btn btn-outline-secondary" disabled>Next</button>
+        {% endif %}
+      </div>
+
+      {% if search_query %}
+      <div class="d-flex justify-content-end mt-3">
+        <a href="{% url 'books_list' %}" class="btn btn-warning shadow">Clear Search</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Add Book Modal -->
+<div class="modal fade" id="addBookModal" tabindex="-1" aria-labelledby="addBookModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addBookModalLabel">Add New Book</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'books_list' %}" class="needs-validation" novalidate>
+        {% csrf_token %}
+        <div class="modal-body">
+          {% for field in form %}
+          <div class="mb-3">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}
+              <small class="form-text text-muted">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+              <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Save Book</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  const csrftoken = getCookie('csrftoken');
+
+  function toggleBag(buttonElement) {
+    const url = buttonElement.dataset.url;
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'Content-Type': 'application/json',
+      }
+    })
+    .then(response => {
+      if (!response.ok) throw new Error('Failed request');
+      return response.json();
+    })
+    .then(data => {
+      if (data.action === 'added') {
+        buttonElement.classList.remove('btn-primary');
+        buttonElement.classList.add('btn-danger');
+        buttonElement.textContent = 'Remove from bag';
+        buttonElement.dataset.action = 'remove';
+      } else if (data.action === 'removed') {
+        buttonElement.classList.remove('btn-danger');
+        buttonElement.classList.add('btn-primary');
+        buttonElement.textContent = 'Add to bag';
+        buttonElement.dataset.action = 'add';
+      }
+    })
+    .catch(error => {
+      alert('Could not update the bag. Try again.');
+      console.error(error);
+    });
+  }
+</script>
+{% endblock %}

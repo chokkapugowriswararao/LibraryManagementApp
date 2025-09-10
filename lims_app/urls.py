@@ -7,6 +7,7 @@ from .views import (
 
 urlpatterns = [
     path('', home, name='home'),
+    path('home/', home, name='home_page'),  # <-- Add this line
     path('readers/', readers_tab, name='readers_tab'),
     path('books/', books_list, name='books_list'),
     path('mybag/', my_bag_tab, name='my_bag_tab'),
@@ -15,5 +16,5 @@ urlpatterns = [
     path('returns/', returns_page, name='returns_page'),
     path('returns/return_loan/<int:loan_id>/', return_loan, name='return_loan'),
     path('api/reader_search/', reader_search_api, name='reader_search_api'),
-
 ]
+

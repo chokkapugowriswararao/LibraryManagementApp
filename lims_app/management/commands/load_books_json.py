@@ -1,112 +1,67 @@
-# lims_app/management/commands/load_books_json.py
-
 import json
-from datetime import datetime, date # Import date for handling year as a date
+from datetime import date
 from django.core.management.base import BaseCommand
-from lims_app.models import Book # Assuming 'lims_app' is your app name
+from lims_app.models import Book # Make sure 'lims_app' is your correct app name
 
 class Command(BaseCommand):
-    help = 'Load books from a new books.json format (compatible with "year" and "link" fields).'
+    help = 'Loads books from a JSON file into the database, preventing duplicates.'
 
-    def handle(self, *args, **kwargs):
-        # --- IMPORTANT: Update this path to your large JSON file ---
-        # If your 1 lakh JSON file is named differently, change this.
-        json_file_path = 'lims_app/books.json' # Example: 'lims_app/your_1_lakh_books.json'
-        
+    # THIS IS THE CRITICAL PART THAT WAS MISSING.
+    # It tells Django that this command accepts one argument.
+    def add_arguments(self, parser):
+        parser.add_argument('json_file_path', type=str, help='The full path to the JSON file to load.')
+
+    # The 'handle' function now uses 'options' to get the argument.
+    def handle(self, *args, **options):
+        json_file_path = options['json_file_path']
+        self.stdout.write(self.style.SUCCESS(f"Starting to load books from: {json_file_path}"))
+
         try:
             with open(json_file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                books_data = json.load(f)
         except FileNotFoundError:
-            self.stderr.write(self.style.ERROR(f"Error: JSON file not found at {json_file_path}."))
+            self.stderr.write(self.style.ERROR(f"Error: The file at {json_file_path} was not found."))
             return
         except json.JSONDecodeError:
-            self.stderr.write(self.style.ERROR(f"Error: Could not decode JSON from {json_file_path}. Check file format for errors."))
+            self.stderr.write(self.style.ERROR("Error: Could not decode JSON. Please check the file for formatting errors."))
             return
 
-        # Assuming your new 1 lakh JSON is an array of book objects directly at the root, like:
-        # [ {book1}, {book2}, ... ]
-        books_data_list = data 
-        
-        # If your new 1 lakh JSON is still structured like your OLD one (e.g., {"books": [...]})
-        # then uncomment the line below and comment out the `books_data_list = data` line:
-        # books_data_list = data.get('books', [])
+        created_count = 0
+        skipped_count = 0
 
-
-        objs = []
-        for book_entry in books_data_list:
-            # --- Map JSON fields to Book model fields ---
-            
-            # Required fields - provide empty string default for get(), then validate
-            title = book_entry.get('title', '')
-            author = book_entry.get('author', '')
+        for entry in books_data:
+            title = entry.get('title', '').strip()
+            author = entry.get('author', '').strip()
 
             if not title or not author:
-                self.stderr.write(self.style.WARNING(f"Skipping book due to missing required field (title or author): {book_entry.get('title', 'N/A')} by {book_entry.get('author', 'N/A')}"))
-                continue # Skip this entry if title or author is missing
+                skipped_count += 1
+                continue
 
-            # published_date (Convert 'year' to a date object)
-            published_year = book_entry.get('year')
             published_date = None
-            if isinstance(published_year, int):
-                # Handle potential negative years (BC) by taking absolute value
-                # And setting it to Jan 1st of that year for simplicity
+            year = entry.get('year')
+            if isinstance(year, int) and year != 0:
                 try:
-                    published_date = date(abs(published_year), 1, 1) 
-                except ValueError: # Catches years like 0 or excessively large/small
-                    self.stderr.write(self.style.WARNING(f"Invalid year '{published_year}' for book '{title}'. Setting published_date to None."))
-            else:
-                self.stderr.write(self.style.WARNING(f"Year is not an integer for book '{title}'. Setting published_date to None."))
-
-
-            # website (Maps from 'link') - Remove trailing newline if present
-            website = book_entry.get('link') 
-            if website and isinstance(website, str):
-                website = website.strip() # Removes whitespace, including newlines
-
-
-            # pages (Direct match, allow None if not found or invalid)
-            pages = book_entry.get('pages', None)
-            if pages is not None:
-                try:
-                    pages = int(pages)
+                    published_date = date(abs(year), 1, 1)
                 except (ValueError, TypeError):
-                    pages = None
-                    self.stderr.write(self.style.WARNING(f"Invalid pages value for '{title}'. Setting pages to None."))
+                    pass # Ignore invalid years
 
-
-            # Fields missing in your new JSON, set to None if your model allows null=True, blank=True
-            # OR provide a default string if your model field is NOT nullable.
-            # I will assume `publisher` should be nullable now, based on previous discussion.
-            isbn = book_entry.get('isbn', None)
-            subtitle = book_entry.get('subtitle', None)
-            description = book_entry.get('description', None)
-            
-            # --- IMPORTANT: publisher field ---
-            # Your new JSON structure DOES NOT have a 'publisher' field.
-            # If your Book model's 'publisher' field is:
-            #   publisher = models.CharField(max_length=200, null=True, blank=True) -> Use `publisher = None` or `book_entry.get('publisher', None)`
-            # If your Book model's 'publisher' field is:
-            #   publisher = models.CharField(max_length=200) -> Use `publisher = "Unknown"` or some default string.
-            # I will provide a default 'Unknown' here, but it's best to make it nullable if missing in your data.
-            publisher = book_entry.get('publisher', 'Unknown') 
-            # If you made `publisher` null/blank in models.py, you can use:
-            # publisher = book_entry.get('publisher', None)
-
-            # Create Book object
-            objs.append(Book(
-                isbn=isbn,
+            # Use update_or_create to prevent duplicates based on title and author
+            # This is safer and more explicit than get_or_create for this task.
+            obj, created = Book.objects.update_or_create(
                 title=title,
-                subtitle=subtitle,
                 author=author,
-                published_date=published_date,
-                publisher=publisher, # Using 'Unknown' or None if you make it nullable
-                pages=pages,
-                description=description,
-                website=website
-            ))
+                defaults={
+                    'published_date': published_date,
+                    'pages': entry.get('pages'),
+                    'website': entry.get('link', '').strip() or None,
+                    'publisher': entry.get('publisher') # Will be None if not present
+                }
+            )
 
-        # Use bulk_create for efficiency. ignore_conflicts=True will prevent errors
-        # if you re-run the command and encounter duplicate ISBNs (if ISBNs are present).
-        # If your data has no ISBNs or they are not unique, remove ignore_conflicts.
-        Book.objects.bulk_create(objs, ignore_conflicts=True) 
-        self.stdout.write(self.style.SUCCESS(f"Successfully loaded or updated {len(objs)} books."))
+            if created:
+                created_count += 1
+        
+        self.stdout.write(self.style.SUCCESS(f"\n--- Import Complete ---"))
+        self.stdout.write(f"Successfully created {created_count} new books.")
+        self.stdout.write(f"Found and updated/skipped {len(books_data) - created_count - skipped_count} existing books.")
+        self.stdout.write(f"Skipped {skipped_count} entries due to missing data.")

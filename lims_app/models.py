@@ -50,6 +50,5 @@ class Loan(models.Model):
     due_date = models.DateTimeField()
     returned = models.BooleanField(default=False)
     returned_date = models.DateTimeField(null=True, blank=True)
-
     def __str__(self):
         return f"{self.book.title} loaned to {self.reader.reader_name}"
